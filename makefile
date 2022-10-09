@@ -21,3 +21,8 @@ lex.yy.c: $(SRC_DIR)/scanner.l
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
+
+.PHONY: test
+test:
+	./build/md fmt ./test-data/input.md | diff --color=always - ./test-data/expected.md
+	echo Test Successful.
