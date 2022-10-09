@@ -44,13 +44,13 @@ int main (int argc, char **args) {
     if (arg_idx == argc) {
       error(6, 0, "Pass an input file!");
     }
-    if (strcmp(args[arg_idx], output_filename) == 0) {
-      error(8, 0, "The output and the input files are the same!");
-    }
-    input_file = fopen(args[arg_idx], "r");
     if (output_filename != NULL) {
+      if (strcmp(args[arg_idx], output_filename) == 0) {
+        error(8, 0, "The output and the input files are the same!");
+      }
       output_file = fopen(output_filename, "w");
     }
+    input_file = fopen(args[arg_idx], "r");
     if (input_file == NULL) {
       error(4, 0, "It wasn't possible to open input file: %s", args[arg_idx]);
     }
