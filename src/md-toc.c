@@ -15,7 +15,7 @@ void generate_table_of_contents (FILE *input_file) {
         if (token_type == TOKEN_NEWLINE || token_type == TOKEN_CODE_BLOCK_NEWLINE) {
             line_count += yyleng;
         }
-        if (token_type == TOKEN_HEADER) {
+        else if (token_type == TOKEN_HEADER) {
             int header_level = 1;
             char *text = yytext;
             while (*text++ != '#') {}
