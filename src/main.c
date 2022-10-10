@@ -19,7 +19,7 @@ int main (int argc, char **args) {
 
     printf("%s toc markdown-file.md\n", args[0]);
 
-    printf("%s [-h|--help]\n", args[0]);
+    printf("%s -h|--help\n", args[0]);
     exit(0);
   } else if (strcmp(args[1], "fmt") == 0) {
     int arg_idx = 1;
