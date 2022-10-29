@@ -2,72 +2,145 @@
 #include <stdlib.h>
 #include <string.h>
 #include <error.h>
+#include <argp.h>
 
 #include "md-fmt.h"
 #include "md-toc.h"
 
+struct argp_option fmt_options[] = {
+  { "output",          'o', "FILE",   0, "Output to FILE instead of standard output" },
+  { "max-line-length", 'm', "LENGTH", 0, "Try to wrap the line at a blank space before exceeding this LENGTH" },
+  { 0 }
+};
 
-int main (int argc, char **args) {
-  if (argc == 1) {
-    error(3, 0, "Specify a subcommand!");
+struct fmt_arguments {
+  char *output_file;
+  int max_line_length;
+  char *input_file;
+};
+
+char fmt_doc[] = "Wrap the lines of markdown considering its special elements";
+
+char fmt_args_doc[] = "MARKDOWN-FILE";
+
+error_t fmt_parse_opt (int key, char *arg, struct argp_state *state) {
+  struct fmt_arguments *fmt_args = state->input;
+
+  switch (key) {
+    case 'o':
+      fmt_args->output_file = arg;
+      break;
+    case 'm':
+      fmt_args->max_line_length = atoi(arg);
+      break;
+    case ARGP_KEY_ARG:
+      if (state->arg_num > 1) {
+        argp_usage(state);
+      }
+      fmt_args->input_file = arg;
+      state->next = state->argc;
+      break;
+    case ARGP_KEY_END:
+      if (state->arg_num < 1) {
+        argp_usage(state);
+      }
+      break;
+    default:
+      return ARGP_ERR_UNKNOWN;
   }
-  if (strcmp(args[1], "--help") == 0 || strcmp(args[1], "-h") == 0) {
-    printf("%s fmt [--max-line-length=80] [--output=formated-file.md] markdown-file.md\n", args[0]);
-    puts("\tDefault maximum line length: 80 8-bit characters");
-    puts("\tDefault output: stdout.");
-    puts("\tThe first non-option value ends the argument list.");
 
-    printf("%s toc markdown-file.md\n", args[0]);
+  return 0;
+}
 
-    printf("%s -h|--help\n", args[0]);
-    exit(0);
-  } else if (strcmp(args[1], "fmt") == 0) {
-    int arg_idx = 1;
-    int max_line_length = 80;
-    FILE *input_file = NULL;
-    FILE *output_file = stdout;
-    char *output_filename = NULL;
-    while (++arg_idx < argc) {
-      char *option = strtok(args[arg_idx], "=");
-      if (strcmp(option, "--max-line-length") == 0) {
-        char *option_value = strtok(NULL, "");
-        sscanf(option_value, "%d", &max_line_length);
-      } else if (strcmp(option, "--output") == 0) {
-        output_filename = strtok(NULL, "");
-      } else if (strcmp(option, "--") == 0) {
-        arg_idx++;
-        break;
-      } else {
-        break;
+struct argp fmt_argp = { fmt_options, fmt_parse_opt, fmt_args_doc, fmt_doc };
+
+struct toc_arguments {
+  char *input_file;
+};
+
+char toc_doc[] = "Generate a table of contents (TOC) from markdown section headers";
+
+char toc_args_doc[] = "MARKDOWN-FILE";
+
+error_t toc_parse_opt (int key, char *arg, struct argp_state *state) {
+  struct toc_arguments *toc_args = state->input;
+
+  switch (key) {
+    case ARGP_KEY_ARG:
+      if (state->arg_num > 1) {
+        argp_usage(state);
       }
-    }
-    if (arg_idx == argc) {
-      error(6, 0, "Pass an input file!");
-    }
-    if (output_filename != NULL) {
-      if (strcmp(args[arg_idx], output_filename) == 0) {
-        error(8, 0, "The output and the input files are the same!");
+      toc_args->input_file = arg;
+      state->next = state->argc;
+      break;
+    case ARGP_KEY_END:
+      if (state->arg_num < 1) {
+        argp_usage(state);
       }
-      output_file = fopen(output_filename, "w");
+      break;
+    default:
+      return ARGP_ERR_UNKNOWN;
+  }
+
+  return 0;
+}
+
+struct argp toc_argp = { NULL, toc_parse_opt, toc_args_doc, toc_doc };
+
+int main (int argc, char **argv) {
+  if (
+    argc <= 1
+    || strcmp(argv[1], "--help") == 0
+    || strcmp(argv[1], "-h") == 0
+    || strcmp(argv[1], "-?") == 0
+  ) {
+    int flags = ARGP_HELP_LONG | ARGP_HELP_USAGE | ARGP_HELP_DOC;
+    char *program_name = strdup(argv[0]);
+    argp_help(&fmt_argp, stderr, flags, strncat(program_name, " fmt", 4));
+    free(program_name);
+    fputs("\n", stderr);
+    program_name = strdup(argv[0]);
+    argp_help(&toc_argp, stderr, flags, strncat(program_name, " toc", 4));
+    free(program_name);
+    if (argc <= 1) {
+      return EXIT_FAILURE;
     }
-    input_file = fopen(args[arg_idx], "r");
-    if (input_file == NULL) {
-      error(4, 0, "It wasn't possible to open input file: %s", args[arg_idx]);
+    return 0;
+  }
+  if (strcmp(argv[1], "fmt") == 0) {
+    struct fmt_arguments fmt_args;
+    fmt_args.max_line_length = 80;
+    fmt_args.output_file = NULL;
+    fmt_args.input_file = NULL;
+    argp_parse(&fmt_argp, argc-1, argv+1, 0, NULL, &fmt_args);
+    FILE *output;
+    if (fmt_args.output_file) {
+      if (strcmp(fmt_args.output_file, fmt_args.input_file) == 0) {
+        error(EXIT_FAILURE, 0, "The output and the input files are the same!");
+      }
+      output = fopen(fmt_args.output_file, "w");
+    } else {
+      output = stdout;
     }
-    if (output_file == NULL) {
-      error(5, 0, "It wasn't possible to open output file: %s", output_filename);
+    FILE *input = fopen(fmt_args.input_file, "r");
+    if (input == NULL) {
+      error(EXIT_FAILURE, 0, "It wasn't possible to open input file: %s", fmt_args.input_file);
     }
-    format_markdown(input_file, output_file, max_line_length);
-    fclose(input_file);
-    fclose(output_file);
-  } else if (strcmp(args[1], "toc") == 0) {
-    if (argc == 2) {
-      error(7, 0, "Pass an input file!");
+    if (output == NULL) {
+      error(EXIT_FAILURE, 0, "It wasn't possible to open output file: %s", fmt_args.output_file);
     }
-    FILE *input_file = fopen(args[2], "r");
-    generate_table_of_contents(input_file);
-    fclose(input_file);
+    format_markdown(input, output, fmt_args.max_line_length);
+    fclose(input);
+    fclose(output);
+  } else if (strcmp(argv[1], "toc") == 0) {
+    struct toc_arguments toc_args;
+    toc_args.input_file = NULL;
+    argp_parse(&toc_argp, argc-1, argv+1, 0, NULL, &toc_args);
+    FILE *input = fopen(toc_args.input_file, "r");
+    generate_table_of_contents(input);
+    fclose(input);
   } else {
-    error(2, 0, "Invalid command!");
+    error(EXIT_FAILURE, 0, "Invalid subcommand!");
   }
+  return 0;
 }
